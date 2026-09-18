@@ -1,55 +1,336 @@
-const KEY="baito_manager_v1";
-const defaults={settings:{jobName:"",wage:1000,hours:3,transport:0,ot:0,startMoney:0},shifts:{},expenses:[]};
-let data=load(), view=new Date(); view.setDate(1), editKey=null;
-function load(){try{const x=JSON.parse(localStorage.getItem(KEY));return x?{settings:{...defaults.settings,...x.settings},shifts:x.shifts||{},expenses:x.expenses||[]}:structuredClone(defaults)}catch{return structuredClone(defaults)}}
-function save(){localStorage.setItem(KEY,JSON.stringify(data))}
-const yen=n=>"¥"+Math.round(Number(n)||0).toLocaleString("ja-JP");
-const pad=n=>String(n).padStart(2,"0");
-const key=d=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-const parse=k=>{let [y,m,d]=k.split("-").map(Number);return new Date(y,m-1,d)};
-function pay(s){return Number(s.hours||0)*Number(s.wage||0)+Number(s.transport||0)+Number(s.overtime||0)*Number(s.otPerMin||0)}
-function entries(){return Object.entries(data.shifts).map(([date,s])=>({date,...s})).sort((a,b)=>a.date.localeCompare(b.date))}
-function expensesTotal(){return data.expenses.reduce((a,x)=>a+Number(x.amount||0),0)}
-function incomeTotal(){return entries().reduce((a,x)=>a+pay(x),0)}
-function balance(){return Number(data.settings.startMoney||0)+incomeTotal()-expensesTotal()}
-function show(id){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active",x.dataset.screen===id));renderAll()}
-document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>show(b.dataset.screen));
-document.getElementById("settingsBtn").onclick=()=>show("settings");
-document.getElementById("calendarLink").onclick=()=>show("calendar");
+(() => {
+"use strict";
 
-function renderHome(){
- let now=new Date(), es=entries().filter(x=>{let d=parse(x.date);return d.getFullYear()===now.getFullYear()&&d.getMonth()===now.getMonth()});
- document.getElementById("balance").textContent=yen(balance());
- document.getElementById("balanceInfo").textContent=`登録シフト ${entries().length}回・支出 ${data.expenses.length}件`;
- document.getElementById("monthIncome").textContent=yen(es.reduce((a,x)=>a+pay(x),0));
- document.getElementById("monthShifts").textContent=es.length+"回";
- document.getElementById("totalIncome").textContent=yen(incomeTotal());
- document.getElementById("allShifts").textContent=entries().length+"回";
- let list=document.getElementById("upcoming"), today=key(now), up=es.filter(x=>x.date>=today).slice(0,6);
- list.innerHTML=up.length?up.map(x=>`<div class="listrow"><div><b>${x.date.replaceAll("-","/")}</b><div class="muted">${x.status==="done"?"勤務済み":"勤務予定"}・${x.hours}時間</div></div><b>${yen(pay(x))}</b></div>`).join(""):'<div class="empty">今月のシフトはありません</div>';
+const STORAGE_KEY = "baito_manager_v1";
+const DEFAULTS = {
+  settings: {jobName:"", wage:1000, hours:3, transport:0, ot:0, startMoney:0},
+  shifts: {},
+  expenses: []
+};
+
+let data = loadData();
+let viewDate = new Date();
+viewDate.setDate(1);
+let editingDate = null;
+
+const $ = (id) => document.getElementById(id);
+const yen = (n) => "¥" + Math.round(Number(n) || 0).toLocaleString("ja-JP");
+const pad = (n) => String(n).padStart(2, "0");
+
+function loadData() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return structuredClone(DEFAULTS);
+    const x = JSON.parse(raw);
+    return {
+      settings: {...DEFAULTS.settings, ...(x.settings || {})},
+      shifts: x.shifts || {},
+      expenses: Array.isArray(x.expenses) ? x.expenses : []
+    };
+  } catch (e) {
+    console.error("データ読み込みエラー", e);
+    return structuredClone(DEFAULTS);
+  }
 }
-function renderCalendar(){
- let y=view.getFullYear(),m=view.getMonth(),first=new Date(y,m,1),start=new Date(y,m,1-first.getDay()),g=document.getElementById("calgrid"),today=key(new Date());
- document.getElementById("monthTitle").textContent=`${y}年${m+1}月`;g.innerHTML="";
- for(let i=0;i<42;i++){let d=new Date(start);d.setDate(start.getDate()+i),k=key(d),s=data.shifts[k],c=document.createElement("button");c.className="day"+(d.getMonth()!=m?" other":"")+(k===today?" today":"");c.innerHTML=`<div class="daynum">${d.getDate()}</div>`;if(s){let z=document.createElement("div");z.className="shift "+(s.status==="done"?"done":"planned");z.textContent=yen(pay(s));c.appendChild(z)}c.onclick=()=>openShift(k);g.appendChild(c)}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
-document.getElementById("prev").onclick=()=>{view.setMonth(view.getMonth()-1);renderCalendar()};document.getElementById("next").onclick=()=>{view.setMonth(view.getMonth()+1);renderCalendar()};
 
-function fillSettings(){let s=data.settings;jobName.value=s.jobName;wage.value=s.wage;hours.value=s.hours;transport.value=s.transport;ot.value=s.ot;startMoney.value=s.startMoney}
-saveSettings.onclick=()=>{data.settings={jobName:jobName.value.trim(),wage:+wage.value||0,hours:+hours.value||0,transport:+transport.value||0,ot:+ot.value||0,startMoney:+startMoney.value||0};save();renderAll();alert("設定を保存しました。")};
+function dateKey(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+}
 
-function openShift(k){editKey=k;let s=data.shifts[k],d=data.settings;shiftDate.textContent=k.replaceAll("-","/");status.value=s?.status||"planned";sHours.value=s?.hours??d.hours;sWage.value=s?.wage??d.wage;sTransport.value=s?.transport??d.transport;sOt.value=s?.overtime??0;deleteShift.style.display=s?"block":"none";previewPay();shiftModal.classList.remove("hidden")}
-document.querySelectorAll("[data-close]").forEach(x=>x.onclick=()=>document.getElementById(x.dataset.close).classList.add("hidden"));
-["sHours","sWage","sTransport","sOt"].forEach(id=>document.getElementById(id).oninput=previewPay);
-function previewPay(){preview.textContent=yen({hours:+sHours.value||0,wage:+sWage.value||0,transport:+sTransport.value||0,overtime:+sOt.value||0,otPerMin:+data.settings.ot||0})}
-saveShift.onclick=()=>{data.shifts[editKey]={status:status.value,hours:+sHours.value||0,wage:+sWage.value||0,transport:+sTransport.value||0,overtime:+sOt.value||0,otPerMin:+data.settings.ot||0};save();shiftModal.classList.add("hidden");renderAll()}
-deleteShift.onclick=()=>{if(confirm("このシフトを削除しますか？")){delete data.shifts[editKey];save();shiftModal.classList.add("hidden");renderAll()}};
+function fromKey(k) {
+  const [y,m,d] = k.split("-").map(Number);
+  return new Date(y, m-1, d);
+}
 
-addExpense.onclick=()=>{eDate.value=key(new Date());eAmount.value="";eName.value="";expenseModal.classList.remove("hidden")}
-saveExpense.onclick=()=>{let amount=+eAmount.value;if(!eDate.value||amount<=0){alert("日付と金額を入力してください。");return}data.expenses.push({date:eDate.value,amount,name:eName.value.trim()});save();expenseModal.classList.add("hidden");renderAll()}
-function renderMoney(){moneyBalance.textContent=yen(balance());moneyIncome.textContent=yen(incomeTotal());moneyExpense.textContent=yen(expensesTotal());let arr=[...data.expenses].sort((a,b)=>b.date.localeCompare(a.date));expenses.innerHTML=arr.length?arr.map((x,i)=>`<div class="listrow"><div><b>${esc(x.name||"支出")}</b><div class="muted">${x.date}</div></div><div><b>-${yen(x.amount)}</b> <button class="link" onclick="delExp(${i})">削除</button></div></div>`).join(""):'<div class="empty">支出はありません</div>'}
-function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",""":"&quot;","'":"&#039;"}[c]))}
-window.delExp=i=>{let arr=[...data.expenses].sort((a,b)=>b.date.localeCompare(a.date)),target=arr[i],idx=data.expenses.indexOf(target);if(confirm("この支出を削除しますか？")){data.expenses.splice(idx,1);save();renderAll()}};
-clear.onclick=()=>{if(confirm("すべてのデータを削除しますか？")){data=structuredClone(defaults);save();fillSettings();renderAll()}};
-function renderAll(){renderHome();renderCalendar();renderMoney()}
-fillSettings();renderAll();if("serviceWorker"in navigator)navigator.serviceWorker.register("sw.js").catch(()=>{});
+function shiftPay(s) {
+  return (Number(s.hours)||0) * (Number(s.wage)||0)
+       + (Number(s.transport)||0)
+       + (Number(s.overtime)||0) * (Number(s.otPerMin)||0);
+}
+
+function shiftEntries() {
+  return Object.entries(data.shifts)
+    .map(([date, shift]) => ({date, ...shift}))
+    .sort((a,b) => a.date.localeCompare(b.date));
+}
+
+function totalIncome() {
+  return shiftEntries().reduce((sum, s) => sum + shiftPay(s), 0);
+}
+
+function totalExpenses() {
+  return data.expenses.reduce((sum, e) => sum + (Number(e.amount)||0), 0);
+}
+
+function currentBalance() {
+  return (Number(data.settings.startMoney)||0) + totalIncome() - totalExpenses();
+}
+
+function switchScreen(screenId) {
+  document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
+  const target = $(screenId);
+  if (target) target.classList.add("active");
+
+  document.querySelectorAll("nav button[data-screen]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.screen === screenId);
+  });
+
+  renderAll();
+  window.scrollTo({top:0, behavior:"smooth"});
+}
+
+function renderHome() {
+  const now = new Date();
+  const monthShifts = shiftEntries().filter(s => {
+    const d = fromKey(s.date);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  });
+
+  $("balance").textContent = yen(currentBalance());
+  $("balanceInfo").textContent = `登録シフト ${shiftEntries().length}回・支出 ${data.expenses.length}件`;
+  $("monthIncome").textContent = yen(monthShifts.reduce((sum,s)=>sum+shiftPay(s),0));
+  $("monthShifts").textContent = monthShifts.length + "回";
+  $("totalIncome").textContent = yen(totalIncome());
+  $("allShifts").textContent = shiftEntries().length + "回";
+
+  const today = dateKey(now);
+  const upcoming = monthShifts.filter(s => s.date >= today).slice(0,6);
+  $("upcoming").innerHTML = upcoming.length
+    ? upcoming.map(s => `
+      <div class="listrow">
+        <div><b>${s.date.replaceAll("-","/")}</b><div class="muted">${s.status==="done"?"勤務済み":"勤務予定"}・${s.hours}時間</div></div>
+        <b>${yen(shiftPay(s))}</b>
+      </div>`).join("")
+    : '<div class="empty">今月のシフトはありません</div>';
+}
+
+function renderCalendar() {
+  const y = viewDate.getFullYear();
+  const m = viewDate.getMonth();
+  const first = new Date(y,m,1);
+  const start = new Date(y,m,1-first.getDay());
+  const grid = $("calgrid");
+  $("monthTitle").textContent = `${y}年${m+1}月`;
+  grid.innerHTML = "";
+  const today = dateKey(new Date());
+
+  for (let i=0; i<42; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate()+i);
+    const k = dateKey(d);
+    const shift = data.shifts[k];
+
+    const cell = document.createElement("button");
+    cell.type = "button";
+    cell.className = "day" + (d.getMonth()!==m ? " other":"") + (k===today ? " today":"");
+    cell.innerHTML = `<div class="daynum">${d.getDate()}</div>`;
+
+    if (shift) {
+      const badge = document.createElement("div");
+      badge.className = "shift " + (shift.status==="done" ? "done":"planned");
+      badge.textContent = yen(shiftPay(shift));
+      cell.appendChild(badge);
+    }
+
+    cell.addEventListener("click", () => openShiftModal(k));
+    grid.appendChild(cell);
+  }
+}
+
+function openShiftModal(k) {
+  editingDate = k;
+  const existing = data.shifts[k];
+  const s = data.settings;
+
+  $("shiftDate").textContent = k.replaceAll("-","/");
+  $("status").value = existing?.status || "planned";
+  $("sHours").value = existing?.hours ?? s.hours;
+  $("sWage").value = existing?.wage ?? s.wage;
+  $("sTransport").value = existing?.transport ?? s.transport;
+  $("sOt").value = existing?.overtime ?? 0;
+  $("deleteShift").style.display = existing ? "block" : "none";
+  updatePreview();
+  $("shiftModal").classList.remove("hidden");
+}
+
+function closeModal(id) {
+  $(id).classList.add("hidden");
+}
+
+function updatePreview() {
+  const temp = {
+    hours: $("sHours").value,
+    wage: $("sWage").value,
+    transport: $("sTransport").value,
+    overtime: $("sOt").value,
+    otPerMin: data.settings.ot
+  };
+  $("preview").textContent = yen(shiftPay(temp));
+}
+
+function renderMoney() {
+  $("moneyBalance").textContent = yen(currentBalance());
+  $("moneyIncome").textContent = yen(totalIncome());
+  $("moneyExpense").textContent = yen(totalExpenses());
+
+  const arr = data.expenses
+    .map((e,i)=>({...e, originalIndex:i}))
+    .sort((a,b)=>b.date.localeCompare(a.date));
+
+  $("expenses").innerHTML = arr.length
+    ? arr.map(e => `
+      <div class="listrow">
+        <div><b>${escapeHtml(e.name || "支出")}</b><div class="muted">${e.date}</div></div>
+        <div><b>-${yen(e.amount)}</b> <button class="link delete-expense" data-index="${e.originalIndex}" type="button">削除</button></div>
+      </div>`).join("")
+    : '<div class="empty">支出はありません</div>';
+
+  document.querySelectorAll(".delete-expense").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const index = Number(btn.dataset.index);
+      if (confirm("この支出を削除しますか？")) {
+        data.expenses.splice(index,1);
+        saveData();
+        renderAll();
+      }
+    });
+  });
+}
+
+function renderSettings() {
+  const s = data.settings;
+  $("jobName").value = s.jobName;
+  $("wage").value = s.wage;
+  $("hours").value = s.hours;
+  $("transport").value = s.transport;
+  $("ot").value = s.ot;
+  $("startMoney").value = s.startMoney;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, c => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+  }[c]));
+}
+
+function renderAll() {
+  renderHome();
+  renderCalendar();
+  renderMoney();
+  renderSettings();
+}
+
+function bindEvents() {
+  document.querySelectorAll("nav button[data-screen]").forEach(btn => {
+    btn.addEventListener("click", () => switchScreen(btn.dataset.screen));
+  });
+
+  $("settingsBtn").addEventListener("click", () => switchScreen("settings"));
+  $("calendarLink").addEventListener("click", () => switchScreen("calendar"));
+
+  $("prev").addEventListener("click", () => {
+    viewDate.setMonth(viewDate.getMonth()-1);
+    renderCalendar();
+  });
+
+  $("next").addEventListener("click", () => {
+    viewDate.setMonth(viewDate.getMonth()+1);
+    renderCalendar();
+  });
+
+  ["sHours","sWage","sTransport","sOt"].forEach(id => {
+    $(id).addEventListener("input", updatePreview);
+  });
+
+  document.querySelectorAll("[data-close]").forEach(el => {
+    el.addEventListener("click", () => closeModal(el.dataset.close));
+  });
+
+  $("saveShift").addEventListener("click", () => {
+    if (!editingDate) return;
+    data.shifts[editingDate] = {
+      status: $("status").value,
+      hours: Number($("sHours").value)||0,
+      wage: Number($("sWage").value)||0,
+      transport: Number($("sTransport").value)||0,
+      overtime: Number($("sOt").value)||0,
+      otPerMin: Number(data.settings.ot)||0
+    };
+    saveData();
+    closeModal("shiftModal");
+    renderAll();
+  });
+
+  $("deleteShift").addEventListener("click", () => {
+    if (!editingDate || !data.shifts[editingDate]) return;
+    if (confirm("このシフトを削除しますか？")) {
+      delete data.shifts[editingDate];
+      saveData();
+      closeModal("shiftModal");
+      renderAll();
+    }
+  });
+
+  $("saveSettings").addEventListener("click", () => {
+    data.settings = {
+      jobName: $("jobName").value.trim(),
+      wage: Number($("wage").value)||0,
+      hours: Number($("hours").value)||0,
+      transport: Number($("transport").value)||0,
+      ot: Number($("ot").value)||0,
+      startMoney: Number($("startMoney").value)||0
+    };
+    saveData();
+    renderAll();
+    alert("設定を保存しました。");
+  });
+
+  $("addExpense").addEventListener("click", () => {
+    $("eDate").value = dateKey(new Date());
+    $("eAmount").value = "";
+    $("eName").value = "";
+    $("expenseModal").classList.remove("hidden");
+  });
+
+  $("saveExpense").addEventListener("click", () => {
+    const amount = Number($("eAmount").value)||0;
+    if (!$("eDate").value || amount <= 0) {
+      alert("日付と金額を入力してください。");
+      return;
+    }
+    data.expenses.push({
+      date: $("eDate").value,
+      amount,
+      name: $("eName").value.trim()
+    });
+    saveData();
+    closeModal("expenseModal");
+    renderAll();
+  });
+
+  $("clear").addEventListener("click", () => {
+    if (confirm("すべてのデータを削除しますか？")) {
+      data = structuredClone(DEFAULTS);
+      saveData();
+      renderAll();
+    }
+  });
+}
+
+function removeOldServiceWorkers() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.getRegistrations()
+    .then(regs => Promise.all(regs.map(reg => reg.unregister())))
+    .catch(err => console.warn("Service Worker解除失敗", err));
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  bindEvents();
+  renderAll();
+  removeOldServiceWorkers();
+});
+})();
