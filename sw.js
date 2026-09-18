@@ -1,1 +1,3 @@
-const C="baito-manager-v1";const A=["./","./index.html","./style.css","./app.js","./manifest.json"];self.addEventListener("install",e=>e.waitUntil(caches.open(C).then(c=>c.addAll(A))));self.addEventListener("fetch",e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request))));
+// Ver.1.1では古いキャッシュによる不具合を避けるため、Service Workerを使用しません。
+self.addEventListener("install", event => self.skipWaiting());
+self.addEventListener("activate", event => event.waitUntil(self.registration.unregister()));
