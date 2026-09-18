@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>バイト管理</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="header"><div><small>SHIFT & MONEY</small><h1>バイト管理</h1></div><button id="settingsBtn">⚙️</button></header>
+
+<main>
+<section id="home" class="screen active">
+<div class="hero"><span>現在残高</span><b id="balance">¥0</b><small id="balanceInfo"></small></div>
+<div class="grid">
+<div class="card"><span>今月の収入</span><b id="monthIncome">¥0</b></div>
+<div class="card"><span>今月の勤務</span><b id="monthShifts">0回</b></div>
+<div class="card"><span>累計収入</span><b id="totalIncome">¥0</b></div>
+<div class="card"><span>登録シフト</span><b id="allShifts">0回</b></div>
+</div>
+<div class="card"><div class="row"><h2>今月のシフト</h2><button class="link" id="calendarLink">カレンダー →</button></div><div id="upcoming"></div></div>
+</section>
+
+<section id="calendar" class="screen">
+<div class="calhead"><button id="prev">‹</button><h2 id="monthTitle"></h2><button id="next">›</button></div>
+<div class="week"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+<div id="calgrid" class="calgrid"></div>
+<p class="muted">🟦 勤務予定　🟩 勤務済み</p>
+</section>
+
+<section id="money" class="screen">
+<div class="card"><div class="row"><h2>お金</h2><button class="primary small" id="addExpense">支出を追加</button></div>
+<div class="money"><div><span>現在残高</span><b id="moneyBalance">¥0</b></div><div><span>収入</span><b id="moneyIncome">¥0</b></div><div><span>支出</span><b id="moneyExpense">¥0</b></div></div></div>
+<div class="card"><h2>支出履歴</h2><div id="expenses"></div></div>
+</section>
+
+<section id="settings" class="screen">
+<div class="card"><h2>基本設定</h2>
+<div class="forms">
+<label>バイト名<input id="jobName" type="text" placeholder="例：コンビニ"></label>
+<label>時給<input id="wage" type="number" min="0"></label>
+<label>基本勤務時間<input id="hours" type="number" min="0" step=".25"></label>
+<label>交通費（1回）<input id="transport" type="number" min="0"></label>
+<label>残業代（1分）<input id="ot" type="number" min="0" step=".1"></label>
+<label>現在残高<input id="startMoney" type="number"></label>
+</div>
+<button class="primary" id="saveSettings">保存</button>
+</div>
+<div class="card"><h2>データ</h2><p class="muted">シフト・支出・設定はこの端末のブラウザに保存されます。</p><button class="danger" id="clear">すべて削除</button></div>
+</section>
+</main>
+
+<nav><button data-screen="home" class="active">🏠<small>ホーム</small></button><button data-screen="calendar">📅<small>シフト</small></button><button data-screen="money">💰<small>お金</small></button><button data-screen="settings">⚙️<small>設定</small></button></nav>
+
+<div id="shiftModal" class="modal hidden"><div class="backdrop" data-close="shiftModal"></div><div class="sheet">
+<div class="row"><h2>シフト登録</h2><button class="close" data-close="shiftModal">×</button></div>
+<p id="shiftDate" class="muted"></p>
+<div class="forms">
+<label>状態<select id="status"><option value="planned">勤務予定</option><option value="done">勤務済み</option></select></label>
+<label>勤務時間<input id="sHours" type="number" min="0" step=".25"></label>
+<label>時給<input id="sWage" type="number" min="0"></label>
+<label>交通費<input id="sTransport" type="number" min="0"></label>
+<label>残業（分）<input id="sOt" type="number" min="0"></label>
+</div>
+<div class="preview">予想収入：<b id="preview">¥0</b></div>
+<div class="actions"><button class="danger" id="deleteShift">削除</button><button class="primary" id="saveShift">登録</button></div>
+</div></div>
+
+<div id="expenseModal" class="modal hidden"><div class="backdrop" data-close="expenseModal"></div><div class="sheet">
+<div class="row"><h2>支出を追加</h2><button class="close" data-close="expenseModal">×</button></div>
+<div class="forms"><label>日付<input id="eDate" type="date"></label><label>金額<input id="eAmount" type="number" min="0"></label><label>内容<input id="eName" type="text" placeholder="例：昼食"></label></div>
+<button class="primary" id="saveExpense">登録</button>
+</div></div>
+
+<script src="app.js"></script>
+</body></html>
