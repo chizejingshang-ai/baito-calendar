@@ -2,107 +2,78 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#111827">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<title>バイト管理</title>
-<link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css">
+<title>バイト収入管理</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f6f8;color:#17202a;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.app{max-width:760px;margin:auto;padding-bottom:80px}header{padding:18px 16px 8px}h1{font-size:22px;margin:0}.sub,.label,.note{color:#6b7280;font-size:12px}.sub{margin-top:4px}main{padding:8px 14px}.screen{display:none}.screen.active{display:block}.card{background:#fff;border-radius:18px;padding:16px;margin:10px 0;box-shadow:0 2px 12px #0000000b}.money{font-size:32px;font-weight:800;margin:5px 0 15px}.grid2,.formgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.metric{background:#f8fafc;border-radius:14px;padding:12px}.metric b{display:block;font-size:18px;margin-top:4px}.row{display:flex;justify-content:space-between;gap:10px;align-items:center}.sectiontitle{font-weight:750;margin:18px 2px 8px}.blue{color:#2563eb}.green{color:#16a34a}.red{color:#dc2626}.nav{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;display:flex;justify-content:center;z-index:10}.nav button{background:none;color:#6b7280;padding:10px 20px;font-size:12px}.nav button.active{color:#2563eb;font-weight:700}.ico{display:block;font-size:21px}.monthbar{display:flex;justify-content:space-between;align-items:center;margin:5px 0 10px}.monthbar button,.smallbtn{border:0;background:#eef2ff;color:#1d4ed8;border-radius:10px;padding:8px 12px}.calendar{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}.dow{text-align:center;color:#6b7280;font-size:11px;padding:3px}.day{min-height:70px;border:1px solid transparent;border-radius:11px;background:#fff;padding:6px;text-align:left}.day.empty{background:transparent}.day.today{border-color:#2563eb}.day.planned{background:#eff6ff}.day.done{background:#ecfdf5}.day.absent{background:#fef2f2}.day .tag,.day .pay{font-size:10px;margin-top:6px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.field label{font-size:12px;color:#6b7280}.field input,.field select{width:100%;padding:11px;border:1px solid #e5e7eb;border-radius:10px;background:white}.primary{width:100%;padding:12px;border:0;border-radius:12px;background:#2563eb;color:white;font-weight:700;margin-top:12px}.danger{padding:10px;border:0;border-radius:10px;background:#fee2e2;color:#b91c1c}.chart{height:190px;display:flex;align-items:flex-end;gap:4px;padding:8px 2px 20px;border-bottom:1px solid #e5e7eb}.barwrap{height:100%;flex:1;position:relative;display:flex;align-items:flex-end}.bar{width:100%;background:#2563eb;border-radius:5px 5px 2px 2px;min-height:2px}.bar.negative{background:#ef4444}.barlabel{position:absolute;top:100%;font-size:9px;color:#6b7280;white-space:nowrap}.monthrow{padding:11px 0;border-bottom:1px solid #e5e7eb}.monthrow:last-child{border-bottom:0}.modal{position:fixed;inset:0;background:#0007;display:none;align-items:flex-end;z-index:20}.modal.show{display:flex}.sheet{background:white;width:100%;max-width:760px;margin:auto;border-radius:22px 22px 0 0;padding:18px 16px 25px}.actions{display:flex;gap:8px;margin-top:12px}.actions>*{flex:1}
+</style>
 </head>
 <body>
-<header class="header">
-  <div><small>SHIFT & MONEY</small><h1>バイト管理</h1></div>
-  <button id="settingsBtn" type="button">⚙️</button>
-</header>
-
+<div class="app">
+<header><h1>💰 バイト収入管理</h1><div class="sub">シフトとお金をまとめて管理</div></header>
 <main>
 <section id="home" class="screen active">
-  <div class="hero"><span>現在残高</span><b id="balance">¥0</b><small id="balanceInfo"></small></div>
-  <div class="grid">
-    <div class="card"><span>今月の収入</span><b id="monthIncome">¥0</b></div>
-    <div class="card"><span>今月の勤務</span><b id="monthShifts">0回</b></div>
-    <div class="card"><span>累計収入</span><b id="totalIncome">¥0</b></div>
-    <div class="card"><span>登録シフト</span><b id="allShifts">0回</b></div>
-  </div>
-  <div class="card">
-    <div class="row"><h2>今月のシフト</h2><button class="link" id="calendarLink" type="button">カレンダー →</button></div>
-    <div id="upcoming"></div>
-  </div>
+<div class="card"><div class="label">現在所持金</div><div id="currentMoney" class="money">¥0</div><div class="grid2"><div class="metric"><span class="label">これからの予想収入</span><b id="futureIncome">¥0</b></div><div class="metric"><span class="label">予想支出</span><b id="futureExpense">¥0</b></div></div></div>
+<div class="card"><div class="row"><b>予想最終残高</b><b id="forecastBalance" class="blue">¥0</b></div><div class="row" style="margin-top:8px"><span class="label">今月の予想収入</span><span id="monthIncome">¥0</span></div><div class="row" style="margin-top:5px"><span class="label">今月の予想支出</span><span id="monthExpense">¥0</span></div></div>
+<div class="sectiontitle">📈 残高推移</div><div class="card"><div id="balanceChart" class="chart"></div></div>
+<div class="sectiontitle">🗓 月別シミュレーション</div><div class="card" id="monthList"></div>
 </section>
 
 <section id="calendar" class="screen">
-  <div class="calhead"><button id="prev" type="button">‹</button><h2 id="monthTitle"></h2><button id="next" type="button">›</button></div>
-  <div class="week"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
-  <div id="calgrid" class="calgrid"></div>
-  <p class="muted">🟦 勤務予定　🟩 勤務済み</p>
-</section>
-
-<section id="money" class="screen">
-  <div class="card">
-    <div class="row"><h2>お金</h2><button class="primary small" id="addExpense" type="button">支出を追加</button></div>
-    <div class="money">
-      <div><span>現在残高</span><b id="moneyBalance">¥0</b></div>
-      <div><span>収入</span><b id="moneyIncome">¥0</b></div>
-      <div><span>支出</span><b id="moneyExpense">¥0</b></div>
-    </div>
-  </div>
-  <div class="card"><h2>支出履歴</h2><div id="expenses"></div></div>
+<div class="monthbar"><button id="prevMonth">‹</button><b id="calTitle"></b><button id="nextMonth">›</button></div>
+<div id="calendarGrid" class="calendar"></div>
+<div class="card note">登録した「出勤予定」は、その日を過ぎると自動で「勤務済み」になります。休んだ日は「欠勤」に変更できます。</div>
+<div class="card"><div class="row"><span>卒業までの残り勤務予定</span><b id="remainingShifts">0回</b></div><div class="row" style="margin-top:8px"><span>今月の勤務予定</span><b id="monthShifts">0回</b></div><div class="row" style="margin-top:8px"><span>今月の勤務済み</span><b id="monthDone">0回</b></div></div>
 </section>
 
 <section id="settings" class="screen">
-  <div class="card">
-    <h2>基本設定</h2>
-    <div class="forms">
-      <label>バイト名<input id="jobName" type="text" placeholder="例：コンビニ"></label>
-      <label>時給<input id="wage" type="number" min="0"></label>
-      <label>基本勤務時間<input id="hours" type="number" min="0" step=".25"></label>
-      <label>交通費（1回）<input id="transport" type="number" min="0"></label>
-      <label>残業代（1分）<input id="ot" type="number" min="0" step=".1"></label>
-      <label>現在残高<input id="startMoney" type="number"></label>
-    </div>
-    <button class="primary" id="saveSettings" type="button">保存</button>
-  </div>
-  <div class="card"><h2>データ</h2><p class="muted">シフト・支出・設定はこの端末のブラウザに保存されます。</p><button class="danger" id="clear" type="button">すべて削除</button></div>
+<div class="sectiontitle">⚙️ 基本設定</div><div class="card"><div class="formgrid">
+<div class="field full"><label>現在所持金</label><input id="sMoney" type="number"></div>
+<div class="field"><label>時給（円）</label><input id="sWage" type="number"></div><div class="field"><label>勤務時間（時間）</label><input id="sHours" type="number" step=".1"></div>
+<div class="field"><label>交通費（1勤務）</label><input id="sTransport" type="number"></div><div class="field"><label>残業割増率（%）</label><input id="sRate" type="number"></div>
+<div class="field"><label>卒業までの勤務目標</label><input id="sGoal" type="number"></div><div class="field"><label>シミュレーション終了</label><input id="sEnd" type="month"></div>
+</div><button id="saveSettings" class="primary">設定を保存</button></div>
+<div class="sectiontitle">💸 支出</div><div class="card"><div class="formgrid"><div class="field"><label>毎月の支出</label><input id="sMonthly" type="number"></div><div class="field"><label>その他支出</label><input id="sOther" type="number"></div></div><button id="saveExpenses" class="primary">支出設定を保存</button></div>
 </section>
 </main>
-
-<nav>
-  <button data-screen="home" class="active" type="button">🏠<small>ホーム</small></button>
-  <button data-screen="calendar" type="button">📅<small>シフト</small></button>
-  <button data-screen="money" type="button">💰<small>お金</small></button>
-  <button data-screen="settings" type="button">⚙️<small>設定</small></button>
-</nav>
-
-<div id="shiftModal" class="modal hidden">
-  <div class="backdrop" data-close="shiftModal"></div>
-  <div class="sheet">
-    <div class="row"><h2>シフト登録</h2><button class="close" data-close="shiftModal" type="button">×</button></div>
-    <p id="shiftDate" class="muted"></p>
-    <div class="forms">
-      <label>状態<select id="status"><option value="planned">勤務予定</option><option value="done">勤務済み</option></select></label>
-      <label>勤務時間<input id="sHours" type="number" min="0" step=".25"></label>
-      <label>時給<input id="sWage" type="number" min="0"></label>
-      <label>交通費<input id="sTransport" type="number" min="0"></label>
-      <label>残業（分）<input id="sOt" type="number" min="0"></label>
-    </div>
-    <div class="preview">予想収入：<b id="preview">¥0</b></div>
-    <div class="actions"><button class="danger" id="deleteShift" type="button">削除</button><button class="primary" id="saveShift" type="button">登録</button></div>
-  </div>
+<nav class="nav"><button data-screen="home" class="active"><span class="ico">🏠</span>お金</button><button data-screen="calendar"><span class="ico">📅</span>シフト</button><button data-screen="settings"><span class="ico">⚙️</span>設定</button></nav>
 </div>
 
-<div id="expenseModal" class="modal hidden">
-  <div class="backdrop" data-close="expenseModal"></div>
-  <div class="sheet">
-    <div class="row"><h2>支出を追加</h2><button class="close" data-close="expenseModal" type="button">×</button></div>
-    <div class="forms">
-      <label>日付<input id="eDate" type="date"></label>
-      <label>金額<input id="eAmount" type="number" min="0"></label>
-      <label>内容<input id="eName" type="text" placeholder="例：昼食"></label>
-    </div>
-    <button class="primary" id="saveExpense" type="button">登録</button>
-  </div>
-</div>
+<div id="modal" class="modal"><div class="sheet"><div class="row"><b id="modalDate">シフト</b><button id="closeModal" class="smallbtn">閉じる</button></div>
+<div class="formgrid" style="margin-top:14px"><div class="field"><label>状態</label><select id="mStatus"><option value="planned">出勤予定</option><option value="done">勤務済み</option><option value="absent">欠勤</option></select></div><div class="field"><label>残業（分）</label><input id="mOvertime" type="number" min="0" value="0"></div></div>
+<div class="card" style="background:#f8fafc"><div class="row"><span>通常勤務</span><b id="mBase">¥0</b></div><div class="row" style="margin-top:6px"><span>残業代</span><b id="mOT">¥0</b></div><div class="row" style="margin-top:6px"><span>交通費</span><b id="mTrans">¥0</b></div><div class="row" style="margin-top:10px"><b>予想支給額</b><b id="mTotal">¥0</b></div></div>
+<div class="actions"><button id="deleteShift" class="danger">削除</button><button id="saveShift" class="primary" style="margin-top:0">保存</button></div>
+</div></div>
 
-<script src="app.js?v=11"></script>
+<script>
+(()=>{"use strict";
+const KEY="baito_manager_v2";
+const defaults={settings:{money:28000,wage:1114,hours:3,transport:480,rate:25,goal:228,end:"2028-03"},expenses:{monthly:27000,other:0},shifts:{}};
+let data=load(), view=new Date(), selected=null;
+function load(){try{let x=JSON.parse(localStorage.getItem(KEY));return x?{settings:{...defaults.settings,...x.settings},expenses:{...defaults.expenses,...x.expenses},shifts:x.shifts||{}}:JSON.parse(JSON.stringify(defaults))}catch(e){return JSON.parse(JSON.stringify(defaults))}}
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+function yen(n){return "¥"+Math.round(n||0).toLocaleString("ja-JP")}
+function pad(n){return String(n).padStart(2,"0")}
+function dk(y,m,d){return y+"-"+pad(m)+"-"+pad(d)}
+function past(k){let t=new Date();t.setHours(0,0,0,0);return new Date(k+"T00:00:00")<t}
+function status(k,v){if(v?.status==="planned"&&past(k))return"done";return v?.status||null}
+function pay(v){if(!v)return 0;let s=data.settings,base=s.wage*s.hours,ot=v.overtime?s.wage/60*v.overtime*(1+s.rate/100):0;return base+ot+s.transport}
+function months(){let [ey,em]=data.settings.end.split("-").map(Number),d=new Date(new Date().getFullYear(),new Date().getMonth(),1),end=new Date(ey,em-1,1),a=[];while(d<=end){a.push(new Date(d));d.setMonth(d.getMonth()+1)}return a}
+function monthly(){let a=[];months().forEach(d=>{let p=d.getFullYear()+"-"+pad(d.getMonth()+1),inc=0,done=0,planned=0;Object.entries(data.shifts).forEach(([k,v])=>{if(k.startsWith(p)){let st=status(k,v);if(st==="done"||st==="planned"){inc+=pay(v);planned++}if(st==="done")done++}});a.push({key:p,label:d.getFullYear()+"年"+(d.getMonth()+1)+"月",income:inc,expense:data.expenses.monthly,done,planned,balance:0})});let b=data.settings.money;a.forEach(x=>{b+=x.income-x.expense;x.balance=b});return a}
+function screen(id){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.screen===id));if(id==="home")home();if(id==="calendar")calendar();if(id==="settings")settings()}
+document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>screen(b.dataset.screen));
+function home(){let a=monthly(),inc=a.reduce((s,x)=>s+x.income,0),exp=a.reduce((s,x)=>s+x.expense,0)+data.expenses.other,cur=a.find(x=>x.key===new Date().getFullYear()+"-"+pad(new Date().getMonth()+1));currentMoney.textContent=yen(data.settings.money);futureIncome.textContent=yen(inc);futureExpense.textContent=yen(exp);forecastBalance.textContent=yen(data.settings.money+inc-exp);monthIncome.textContent=yen(cur?.income||0);monthExpense.textContent=yen(cur?.expense||0);let c=balanceChart;c.innerHTML="";let vals=a.map(x=>x.balance),lo=Math.min(0,...vals),hi=Math.max(1,...vals),span=hi-lo||1;a.forEach(x=>{let w=document.createElement("div");w.className="barwrap";let b=document.createElement("div");b.className="bar"+(x.balance<0?" negative":"");b.style.height=Math.max(2,(x.balance-lo)/span*100)+"%";b.title=x.label+" "+yen(x.balance);w.appendChild(b);c.appendChild(w)});monthList.innerHTML=a.map(x=>'<div class="monthrow"><div class="row"><b>'+x.label+'</b><b>'+yen(x.balance)+'</b></div><div class="row" style="margin-top:5px;font-size:12px;color:#6b7280"><span>収入 '+yen(x.income)+'</span><span>支出 '+yen(x.expense)+'</span></div></div>').join("")}
+function calendar(){let y=view.getFullYear(),m=view.getMonth()+1;calTitle.textContent=y+"年"+m+"月";calendarGrid.innerHTML=["日","月","火","水","木","金","土"].map(x=>'<div class="dow">'+x+"</div>").join("");let first=new Date(y,m-1,1).getDay(),days=new Date(y,m,0).getDate(),p=0,dn=0;for(let i=0;i<first;i++)calendarGrid.innerHTML+='<div class="day empty"></div>';for(let d=1;d<=days;d++){let k=dk(y,m,d),v=data.shifts[k],st=status(k,v),e=document.createElement("button");e.className="day "+(st||"");let t=new Date();if(t.getFullYear()===y&&t.getMonth()+1===m&&t.getDate()===d)e.classList.add("today");e.innerHTML='<div>'+d+"</div>"+(st?'<div class="tag">'+(st==="done"?"勤務済み":st==="planned"?"出勤予定":"欠勤")+"</div>":"")+(st==="done"||st==="planned"?'<div class="pay">'+yen(pay(v))+"</div>":"");if(st==="planned")p++;if(st==="done")dn++;e.onclick=()=>openShift(k);calendarGrid.appendChild(e)}let all=Object.entries(data.shifts).filter(([k,v])=>status(k,v)==="planned"||status(k,v)==="done").length;remainingShifts.textContent=Math.max(0,data.settings.goal-all)+"回";monthShifts.textContent=p+dn+"回";monthDone.textContent=dn+"回"}
+prevMonth.onclick=()=>{view.setMonth(view.getMonth()-1);calendar()};nextMonth.onclick=()=>{view.setMonth(view.getMonth()+1);calendar()};
+function settings(){sMoney.value=data.settings.money;sWage.value=data.settings.wage;sHours.value=data.settings.hours;sTransport.value=data.settings.transport;sRate.value=data.settings.rate;sGoal.value=data.settings.goal;sEnd.value=data.settings.end;sMonthly.value=data.expenses.monthly;sOther.value=data.expenses.other}
+saveSettings.onclick=()=>{data.settings={money:+sMoney.value||0,wage:+sWage.value||0,hours:+sHours.value||0,transport:+sTransport.value||0,rate:+sRate.value||0,goal:+sGoal.value||0,end:sEnd.value||"2028-03"};save();home();calendar();alert("設定を保存しました")};
+saveExpenses.onclick=()=>{data.expenses={monthly:+sMonthly.value||0,other:+sOther.value||0};save();home();alert("支出設定を保存しました")};
+function openShift(k){selected=k;let v=data.shifts[k]||{status:"planned",overtime:0};modalDate.textContent=k;mStatus.value=status(k,v)||"planned";mOvertime.value=v.overtime||0;preview();modal.classList.add("show")}
+function preview(){let o=+mOvertime.value||0,s=data.settings,base=s.wage*s.hours,ot=s.wage/60*o*(1+s.rate/100);mBase.textContent=yen(base);mOT.textContent=yen(ot);mTrans.textContent=yen(s.transport);mTotal.textContent=yen(base+ot+s.transport)}
+mOvertime.oninput=preview;closeModal.onclick=()=>modal.classList.remove("show");saveShift.onclick=()=>{data.shifts[selected]={status:mStatus.value,overtime:+mOvertime.value||0};save();modal.classList.remove("show");calendar();home()};deleteShift.onclick=()=>{delete data.shifts[selected];save();modal.classList.remove("show");calendar();home()};
+home();calendar();settings();
+})();
+</script>
 </body>
 </html>
