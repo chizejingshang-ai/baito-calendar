@@ -34,6 +34,8 @@
 <div class="field"><label>交通費（1勤務）</label><input id="sTransport" type="number"></div><div class="field"><label>残業割増率（%）</label><input id="sRate" type="number"></div>
 <div class="field"><label>平均出勤数（回/月）</label><input id="sAvgShifts" type="number" step=".1"></div><div class="field"><label>卒業までの勤務目標</label><input id="sGoal" type="number"></div>
 <div class="field"><label>全体シミュレーション開始</label><input id="sStart" type="month"></div><div class="field"><label>全体シミュレーション終了</label><input id="sEnd" type="month"></div>
+<div class="field"><label>勤務開始月</label><input id="sWorkStart" type="month"></div><div class="field"><label>勤務終了月</label><input id="sWorkEnd" type="month"></div>
+<div class="field full"><div class="note">平均出勤数による予想収入は「勤務開始月〜勤務終了月」だけに発生します。勤務終了月のシフト分は翌月に給料として入ります。</div></div>
 </div><button id="saveSettings" class="primary">設定を保存</button></div>
 
 <div class="sectiontitle">💸 固定支出</div><div class="card">
@@ -62,7 +64,7 @@
 <script>
 (()=>{"use strict";
 const KEY="baito_manager_v3";
-const defaults={settings:{money:28000,wage:1114,hours:3,transport:480,rate:25,avgShifts:12,goal:228,start:"2026-09",end:"2028-03"},expenses:{monthly:27000,items:[],fixed:[]},shifts:{}};
+const defaults={settings:{money:28000,wage:1114,hours:3,transport:480,rate:25,avgShifts:12,goal:228,start:"2026-09",end:"2028-03",workStart:"2026-09",workEnd:"2027-03"},expenses:{monthly:27000,items:[],fixed:[]},shifts:{}};
 let data=load(),view=new Date(),selected=null;
 function load(){try{let x=JSON.parse(localStorage.getItem(KEY));return x?{settings:{...defaults.settings,...x.settings},expenses:{...defaults.expenses,...x.expenses,items:Array.isArray(x.expenses?.items)?x.expenses.items:[]},shifts:x.shifts||{}}:clone(defaults)}catch(e){return clone(defaults)}}
 function clone(x){return JSON.parse(JSON.stringify(x))}
@@ -74,20 +76,96 @@ function past(k){let t=new Date();t.setHours(0,0,0,0);return new Date(k+"T00:00:
 function st(k,v){return v?.status==="planned"&&past(k)?"done":v?.status||null}
 function pay(v){if(!v)return 0;let s=data.settings,base=s.wage*s.hours,ot=s.wage/60*(+v.overtime||0)*(1+s.rate/100);return base+ot+s.transport}
 function monthDates(){let [sy,sm]=(data.settings.start||"2026-09").split("-").map(Number),[ey,em]=data.settings.end.split("-").map(Number),d=new Date(sy,sm-1,1),end=new Date(ey,em-1,1),a=[];while(d<=end){a.push(new Date(d));d.setMonth(d.getMonth()+1)}return a}
-function calcMonths(){let a=[];monthDates().forEach(d=>{let key=d.getFullYear()+"-"+pad(d.getMonth()+1),inc=0,actual=0;Object.entries(data.shifts).forEach(([k,v])=>{let ss=st(k,v);if(ss==="done"||ss==="planned"){let pd=new Date(k+"T00:00:00");pd.setMonth(pd.getMonth()+1);let pk=pd.getFullYear()+"-"+pad(pd.getMonth()+1);if(pk===key){inc+=pay(v);actual++}}});
-let future=actual===0?data.settings.avgShifts:actual;let predicted=actual>0?inc:future*(data.settings.wage*data.settings.hours+data.settings.transport);if(key===currentKey())predicted=inc>0?inc:future*(data.settings.wage*data.settings.hours+data.settings.transport);
-let extras=data.expenses.items.filter(x=>x.month===key).reduce((s,x)=>s+Number(x.amount||0),0);
-let fixed=(data.expenses.fixed||[]).reduce((s,x)=>key>=x.from&&key<=x.to?s+Number(x.amount||0):s,0);
-a.push({key,label:d.getFullYear()+"年"+(d.getMonth()+1)+"月",income:predicted,fixed,extra:extras,actual,avg:future,balance:0})});
-let b=data.settings.money;a.forEach(x=>{b+=x.income-x.fixed-x.extra;x.balance=b});return a}
+function calcMonths(){
+  let a=[];
+  const s=data.settings;
+  const workStart=s.workStart||s.start||"2026-09";
+  const workEnd=s.workEnd||s.end||"2028-03";
+  const simStart=s.start||"2026-09";
+  monthDates().forEach((d,monthIndex)=>{
+    let key=d.getFullYear()+"-"+pad(d.getMonth()+1),inc=0,actual=0;
+
+    // 登録済みシフトは「勤務月」を基準に、翌月へ給料を入れる。
+    // 勤務期間外のシフトはシミュレーション収入に入れない。
+    Object.entries(data.shifts).forEach(([k,v])=>{
+      let ss=st(k,v);
+      if((ss==="done"||ss==="planned") && k>=workStart && k<=workEnd){
+        let pd=new Date(k+"T00:00:00");
+        pd.setMonth(pd.getMonth()+1);
+        let pk=pd.getFullYear()+"-"+pad(pd.getMonth()+1);
+        if(pk===key){inc+=pay(v);actual++}
+      }
+    });
+
+    const inWorkPeriod=key>=workStart && key<=workEnd;
+    const isFirstMonth=key===simStart;
+
+    // 初月は現在所持金が「ここまでに受け取った給料」を含んでいる前提。
+    // そのため平均出勤数からの予想給料は初月には足さない。
+    // 2か月目以降は、勤務期間内で実シフトがない月だけ平均出勤数から予測。
+    let predicted=inc;
+    if(actual===0 && !isFirstMonth && inWorkPeriod){
+      predicted=s.avgShifts*(s.wage*s.hours+s.transport);
+    }
+
+    let extras=data.expenses.items.filter(x=>x.month===key)
+      .reduce((sum,x)=>sum+Number(x.amount||0),0);
+    let fixed=(data.expenses.fixed||[])
+      .reduce((sum,x)=>key>=x.from&&key<=x.to?sum+Number(x.amount||0):sum,0);
+
+    a.push({
+      key,
+      label:d.getFullYear()+"年"+(d.getMonth()+1)+"月",
+      income:predicted,
+      fixed,
+      extra:extras,
+      actual,
+      avg:(actual===0 && !isFirstMonth && inWorkPeriod)?s.avgShifts:0,
+      inWorkPeriod,
+      balance:0
+    });
+  });
+
+  let b=s.money;
+  a.forEach(x=>{b+=x.income-x.fixed-x.extra;x.balance=b});
+  return a
+}
 function currentKey(){let d=new Date();return d.getFullYear()+"-"+pad(d.getMonth()+1)}
 function go(id){document.querySelectorAll(".screen").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.toggle("active",x.dataset.screen===id));if(id==="home")home();if(id==="calendar")calendar();if(id==="settings")settings()}
 document.querySelectorAll(".nav button").forEach(b=>b.onclick=()=>go(b.dataset.screen));
-function home(){let a=calcMonths(),inc=a.reduce((s,x)=>s+x.income,0),exp=a.reduce((s,x)=>s+x.fixed+x.extra,0);currentMoney.textContent=yen(data.settings.money);futureIncome.textContent=yen(inc);futureExpense.textContent=yen(exp);forecastBalance.textContent=yen(data.settings.money+inc-exp);let cur=a.find(x=>x.key===currentKey());monthIncome.textContent=yen(cur?.income||0);monthExpense.textContent=yen((cur?.fixed||0)+(cur?.extra||0));let vals=a.map(x=>x.balance),lo=Math.min(0,...vals),hi=Math.max(1,...vals),span=hi-lo||1;balanceChart.innerHTML="";a.forEach(x=>{let w=document.createElement("div");w.className="barwrap";let b=document.createElement("div");b.className="bar"+(x.balance<0?" negative":"");b.style.height=Math.max(2,(x.balance-lo)/span*100)+"%";b.title=x.label+" "+yen(x.balance);w.appendChild(b);balanceChart.appendChild(w)});chartSummary.textContent="最終予想残高："+yen(a.length?a[a.length-1].balance:0)+" ／ "+a.length+"か月をシミュレーション";monthList.innerHTML=a.map(x=>'<div class="monthrow"><div class="row"><b>'+x.label+'</b><b class="'+(x.balance<0?"red":"")+'">'+yen(x.balance)+'</b></div><div class="row" style="margin-top:6px;font-size:12px;color:#6b7280"><span>収入 '+yen(x.income)+'</span><span>固定 '+yen(x.fixed)+'</span><span>予定 '+yen(x.extra)+'</span></div><div class="note" style="margin-top:5px">'+(x.actual>0?"実シフト "+x.actual+"回":"平均 "+x.avg+"回/月で予測")+'</div></div>').join("")}
+function home(){let a=calcMonths(),inc=a.reduce((s,x)=>s+x.income,0),exp=a.reduce((s,x)=>s+x.fixed+x.extra,0);currentMoney.textContent=yen(data.settings.money);futureIncome.textContent=yen(inc);futureExpense.textContent=yen(exp);forecastBalance.textContent=yen(data.settings.money+inc-exp);let cur=a.find(x=>x.key===currentKey());monthIncome.textContent=yen(cur?.income||0);monthExpense.textContent=yen((cur?.fixed||0)+(cur?.extra||0));let vals=a.map(x=>x.balance),lo=Math.min(0,...vals),hi=Math.max(1,...vals),span=hi-lo||1;balanceChart.innerHTML="";a.forEach(x=>{let w=document.createElement("div");w.className="barwrap";let b=document.createElement("div");b.className="bar"+(x.balance<0?" negative":"");b.style.height=Math.max(2,(x.balance-lo)/span*100)+"%";b.title=x.label+" "+yen(x.balance);w.appendChild(b);balanceChart.appendChild(w)});chartSummary.innerHTML="最終予想残高："+yen(a.length?a[a.length-1].balance:0)+" ／ "+a.length+"か月をシミュレーション<br>勤務期間："+(data.settings.workStart||data.settings.start)+" ～ "+(data.settings.workEnd||data.settings.end);monthList.innerHTML=a.map(x=>'<div class="monthrow"><div class="row"><b>'+x.label+'</b><b class="'+(x.balance<0?"red":"")+'">'+yen(x.balance)+'</b></div><div class="row" style="margin-top:6px;font-size:12px;color:#6b7280"><span>収入 '+yen(x.income)+'</span><span>固定 '+yen(x.fixed)+'</span><span>予定 '+yen(x.extra)+'</span></div><div class="note" style="margin-top:5px">'+(x.actual>0?"実シフト "+x.actual+"回":"平均 "+x.avg+"回/月で予測")+'</div></div>').join("")}
 function calendar(){let y=view.getFullYear(),m=view.getMonth()+1;calTitle.textContent=y+"年"+m+"月";calendarGrid.innerHTML=["日","月","火","水","木","金","土"].map(x=>'<div class="dow">'+x+"</div>").join("");let first=new Date(y,m-1,1).getDay(),days=new Date(y,m,0).getDate(),p=0,dn=0;for(let i=0;i<first;i++)calendarGrid.innerHTML+='<div class="day empty"></div>';for(let d=1;d<=days;d++){let k=dk(y,m,d),v=data.shifts[k],s=st(k,v),e=document.createElement("button");e.className="day "+(s||"");let t=new Date();if(t.getFullYear()===y&&t.getMonth()+1===m&&t.getDate()===d)e.classList.add("today");e.innerHTML="<div>"+d+"</div>"+(s?'<div class="tag">'+(s==="done"?"勤務済み":s==="planned"?"出勤予定":"欠勤")+"</div>":"")+(s==="done"||s==="planned"?'<div class="pay">'+yen(pay(v))+"</div>":"");if(s==="planned")p++;if(s==="done")dn++;e.onclick=()=>openShift(k);calendarGrid.appendChild(e)}let all=Object.entries(data.shifts).filter(([k,v])=>st(k,v)==="planned"||st(k,v)==="done").length;remainingShifts.textContent=Math.max(0,data.settings.goal-all)+"回";monthShifts.textContent=p+dn+"回";monthDone.textContent=dn+"回"}
 prevMonth.onclick=()=>{view.setMonth(view.getMonth()-1);calendar()};nextMonth.onclick=()=>{view.setMonth(view.getMonth()+1);calendar()};
-function settings(){sMoney.value=data.settings.money;sWage.value=data.settings.wage;sHours.value=data.settings.hours;sTransport.value=data.settings.transport;sRate.value=data.settings.rate;sAvgShifts.value=data.settings.avgShifts;sGoal.value=data.settings.goal;sStart.value=data.settings.start||"2026-09";sEnd.value=data.settings.end;renderExpenses();renderFixed()}
-saveSettings.onclick=()=>{data.settings={money:+sMoney.value||0,wage:+sWage.value||0,hours:+sHours.value||0,transport:+sTransport.value||0,rate:+sRate.value||0,avgShifts:+sAvgShifts.value||0,goal:+sGoal.value||0,start:sStart.value||"2026-09",end:sEnd.value||"2028-03"};save();home();calendar();alert("設定を保存しました")};
+function settings(){
+  sMoney.value=data.settings.money;
+  sWage.value=data.settings.wage;
+  sHours.value=data.settings.hours;
+  sTransport.value=data.settings.transport;
+  sRate.value=data.settings.rate;
+  sAvgShifts.value=data.settings.avgShifts;
+  sGoal.value=data.settings.goal;
+  sStart.value=data.settings.start||"2026-09";
+  sEnd.value=data.settings.end||"2028-03";
+  sWorkStart.value=data.settings.workStart||sStart.value;
+  sWorkEnd.value=data.settings.workEnd||"2027-03";
+  renderExpenses();
+  renderFixed()
+}
+saveSettings.onclick=()=>{
+  const start=sStart.value||"2026-09";
+  const end=sEnd.value||"2028-03";
+  const workStart=sWorkStart.value||start;
+  const workEnd=sWorkEnd.value||"2027-03";
+  if(end<start){alert("全体シミュレーション終了月は開始月以降にしてください");return}
+  if(workEnd<workStart){alert("勤務終了月は勤務開始月以降にしてください");return}
+  if(workStart<start || workEnd>end){alert("勤務期間は全体シミュレーション期間の中に設定してください");return}
+  data.settings={
+    money:+sMoney.value||0,wage:+sWage.value||0,hours:+sHours.value||0,
+    transport:+sTransport.value||0,rate:+sRate.value||0,avgShifts:+sAvgShifts.value||0,
+    goal:+sGoal.value||0,start,end,workStart,workEnd
+  };
+  save();home();calendar();alert("設定を保存しました")
+};
 addFixed.onclick=()=>{let name=prompt("固定支出の名前");if(!name)return;let amount=Number(prompt("月額はいくら？")||0);if(!amount)return;let from=prompt("開始月（例：2026-09）",data.settings.start||"2026-09");if(!from)return;let to=prompt("終了月（例：2027-03）",data.settings.end||"2028-03");if(!to||to<from)return;data.expenses.fixed.push({name,amount,from,to});save();renderFixed();home()};
 function renderFixed(){fixedList.innerHTML="";let list=data.expenses.fixed||[];if(!list.length){fixedList.innerHTML='<div class="note" style="margin-top:12px">固定支出はまだありません。</div>';return}list.forEach((x,i)=>{let d=document.createElement("div");d.className="expense";d.innerHTML='<div class="row"><b>'+escapeHtml(x.name)+'</b><b>'+yen(x.amount)+'/月</b></div><div class="row" style="margin-top:4px"><small>'+x.from+' ～ '+x.to+'</small><button class="danger">削除</button></div>';d.querySelector("button").onclick=()=>{data.expenses.fixed.splice(i,1);save();renderFixed();home()};fixedList.appendChild(d)})}
 function renderExpenses(){expenseList.innerHTML="";if(!data.expenses.items.length){expenseList.innerHTML='<div class="note" style="margin-top:12px">予定支出はまだありません。</div>';return}data.expenses.items.forEach((x,i)=>{let d=document.createElement("div");d.className="expense";d.innerHTML='<div class="row"><b>'+escapeHtml(x.name)+'</b><b>'+yen(x.amount)+'</b></div><div class="row" style="margin-top:4px"><small>'+x.month+'</small><button class="danger">削除</button></div>';d.querySelector("button").onclick=()=>{data.expenses.items.splice(i,1);save();renderExpenses();home()};expenseList.appendChild(d)})}
